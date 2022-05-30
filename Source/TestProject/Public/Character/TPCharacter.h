@@ -8,6 +8,7 @@
 
 class UCameraComponent;
 class USpringArmComponent;
+class UTPHealthComponent;
 
 UCLASS()
 class TESTPROJECT_API ATPCharacter : public ACharacter
@@ -25,13 +26,18 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraComponent")
     UCameraComponent* CameraComponent;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraComponent")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SpringArmComponent")
     USpringArmComponent* SpringArmComponent;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HealthComponent")
+    UTPHealthComponent* HealthComponent;
+
     void MoveForward(float Amount);
+    UFUNCTION(BlueprintCallable)
     void MoveRight(float Amount);
 
-    void Jump();
+    UFUNCTION()
+    void OnPlayerDead();
 
 public:
     // Called every frame
