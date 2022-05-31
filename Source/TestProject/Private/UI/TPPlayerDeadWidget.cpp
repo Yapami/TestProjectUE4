@@ -21,8 +21,9 @@ FString UTPPlayerDeadWidget::GetGameResultByIndex(int32 Index) const
     UTPSaveGame* SaveGameInstance =
         Cast<UTPSaveGame>(UGameplayStatics::LoadGameFromSlot("TPSaves", 0));
 
-    if ((Index < 0) && (Index > SaveGameInstance->GetGameResults().Num()) &&
-        !SaveGameInstance->GetGameResults().IsValidIndex(Index))
+    if ((Index < 0) || (Index > SaveGameInstance->GetGameResults().Num()) ||
+        !SaveGameInstance->GetGameResults().IsValidIndex(Index) ||
+        SaveGameInstance->GetGameResults().Num() == 0)
     {
         return "---";
     }
