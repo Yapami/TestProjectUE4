@@ -33,6 +33,8 @@ protected:
     virtual void BeginPlay() override;
 
 private:
+    UPROPERTY(VisibleAnywhere)
     UUserWidget* PlayerAliveHUDWidget;
+    UPROPERTY(VisibleAnywhere)
     UUserWidget* PlayerDeadHUDWidget;
 };
