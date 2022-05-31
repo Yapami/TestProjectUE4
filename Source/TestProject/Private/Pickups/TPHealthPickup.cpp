@@ -8,47 +8,44 @@
 
 ATPHealthPickup::ATPHealthPickup()
 {
-    HealthCrossPickup = CreateDefaultSubobject<UStaticMeshComponent>("HealthCross");
-    HealthCrossPickup->SetupAttachment(GetRootComponent());
-
-    HealthCrossPickup->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-    HealthCrossPickup->SetVisibility(false, true);
+    MakePickupUnreachable();
 }
 
 void ATPHealthPickup::NotifyActorBeginOverlap(AActor* OtherActor)
 {
     Super::NotifyActorBeginOverlap(OtherActor);
 
-    ATPCharacter* Player = Cast<ATPCharacter>(OtherActor);
+    HealingPlayer(OtherActor);
+
+    MakePickupUnreachable();
+
+    MakeReachableRandomHealthPickup();
+}
+
+void ATPHealthPickup::MakeReachableRandomHealthPickup()
+{
+    ATPGameModeBase* GameMode = Cast<ATPGameModeBase>(UGameplayStatics::GetGameMode(GetWorld()));
+    if (!GameMode)
+    {
+        return;
+    }
+
+    GameMode->HealthPickupsRespawn();
+}
+
+void ATPHealthPickup::HealingPlayer(AActor* Actor)
+{
+    ATPCharacter* Player = Cast<ATPCharacter>(Actor);
     if (!Player)
     {
         return;
     }
     UTPHealthComponent* HealthComponent =
         Cast<UTPHealthComponent>(Player->GetComponentByClass(UTPHealthComponent::StaticClass()));
-    if (HealthComponent)
+    if (!HealthComponent)
     {
-        HealthComponent->SetHealth(HealthComponent->GetHealth() + 30);
+        return;
     }
 
-    HealthCrossPickup->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-    HealthCrossPickup->SetVisibility(false, true);
-
-    ATPGameModeBase* GameMode = Cast<ATPGameModeBase>(UGameplayStatics::GetGameMode(GetWorld()));
-    if (GameMode)
-    {
-        GameMode->HealthPickupsRespawn();
-    }
-}
-
-bool ATPHealthPickup::IsPickupReachable()
-{
-    return HealthCrossPickup->GetVisibleFlag() &&
-           HealthCrossPickup->GetCollisionResponseToChannels() == ECollisionResponse::ECR_Overlap;
-}
-
-void ATPHealthPickup::PickupRespawn()
-{
-    HealthCrossPickup->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
-    HealthCrossPickup->SetVisibility(true, true);
+    HealthComponent->SetHealth(HealthComponent->GetHealth() + HealingAmount);
 }

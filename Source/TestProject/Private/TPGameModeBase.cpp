@@ -2,17 +2,14 @@
 
 #include "TPGameModeBase.h"
 #include "Character/TPCharacter.h"
-#include "Character/TPPlayerController.h"
 #include "Components/TPHealthComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "SaveSystem/TPSaveGame.h"
 #include "UI/TPPlayerHUD.h"
-#include "UI/TPPlayerHUDWidget.h"
 
 ATPGameModeBase::ATPGameModeBase()
 {
     DefaultPawnClass = ATPCharacter::StaticClass();
-    PlayerControllerClass = ATPPlayerController::StaticClass();
     HUDClass = ATPPlayerHUD::StaticClass();
 }
 
@@ -23,16 +20,17 @@ void ATPGameModeBase::BeginPlay()
                                           HealthPickups);
     HealthPickupsRespawn();
 
+    ATPGameModeBase* GameMode = Cast<ATPGameModeBase>(GetWorld()->GetAuthGameMode());
+    if (!GameMode)
+    {
+        return;
+    }
+    GameMode->OnChangeGameState.AddDynamic(this, &ATPGameModeBase::ChangeGameState);
+
     APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), NULL);
     check(PlayerController);
-    ATPCharacter* Player = Cast<ATPCharacter>(PlayerController->GetCharacter());
-    check(Player);
-    UTPHealthComponent* HealthComponent =
-        Cast<UTPHealthComponent>(Player->GetComponentByClass(UTPHealthComponent::StaticClass()));
-    check(HealthComponent);
-    HealthComponent->PlayerDead.AddDynamic(this, &ATPGameModeBase::FinishGame);
-
     ATPPlayerHUD* HUD = Cast<ATPPlayerHUD>(PlayerController->GetHUD());
+    check(HUD);
     UpdateGameTimeDelegate.AddDynamic(HUD, &ATPPlayerHUD::UpdateGameTime);
 }
 
@@ -43,11 +41,13 @@ void ATPGameModeBase::HealthPickupsRespawn()
         return;
     }
 
-    int32 RandomNum = FMath::RandRange(0, 4);
-    static int32 PreviousNum = RandomNum;
+    const int32 HealthPickupsAmount = HealthPickups.Num() - 1;
+
+    static int32 PreviousNum = FMath::RandRange(0, HealthPickupsAmount);
+    int32 RandomNum;
     while (true)
     {
-        RandomNum = FMath::RandRange(0, 4);
+        RandomNum = FMath::RandRange(0, HealthPickupsAmount);
 
         if (RandomNum != PreviousNum)
         {
@@ -57,20 +57,23 @@ void ATPGameModeBase::HealthPickupsRespawn()
     }
 
     ATPHealthPickup* HealthPickup = Cast<ATPHealthPickup>(HealthPickups[RandomNum]);
-    if (HealthPickup)
+    if (!HealthPickup)
     {
-        HealthPickup->PickupRespawn();
+        return;
     }
+    HealthPickup->MakePickupReachable();
 }
 
-void ATPGameModeBase::SetupPlayerLifeTimer()
+void ATPGameModeBase::SetupGameStatePlayerAlive()
 {
+    OnChangeGameState.Broadcast(EGameState::PlayerIsAlive);
     GetWorld()->GetTimerManager().SetTimer(PlayerLifeTimer, this, &ATPGameModeBase::UpdateGameTime,
                                            TimerRate, true);
 }
 
 void ATPGameModeBase::DestroyPlayerLifeTimer()
 {
+    SaveResult();
     GetWorld()->GetTimerManager().ClearTimer(PlayerLifeTimer);
 }
 
@@ -92,7 +95,34 @@ void ATPGameModeBase::UpdateGameTime()
     UpdateGameTimeDelegate.Broadcast(TimerRemaining);
 }
 
-void ATPGameModeBase::FinishGame()
+void ATPGameModeBase::SaveResult()
 {
-    DestroyPlayerLifeTimer();
+    UTPSaveGame* SaveGameInstance = nullptr;
+    if (UGameplayStatics::DoesSaveGameExist("TPSaves", 0))
+    {
+        SaveGameInstance = Cast<UTPSaveGame>(UGameplayStatics::LoadGameFromSlot("TPSaves", 0));
+    }
+    else
+    {
+        SaveGameInstance =
+            Cast<UTPSaveGame>(UGameplayStatics::CreateSaveGameObject(UTPSaveGame::StaticClass()));
+    }
+
+    SaveGameInstance->AddNewResult(TimerRemaining);
+
+    for (auto A : SaveGameInstance->GetGameResults())
+    {
+        UE_LOG(LogTemp, Error, TEXT("%i"), A)
+    }
+    UE_LOG(LogTemp, Error, TEXT("------------------------------------"))
+
+    UGameplayStatics::SaveGameToSlot(SaveGameInstance, TEXT("TPSaves"), 0);
+}
+
+void ATPGameModeBase::ChangeGameState(EGameState State)
+{
+    if (State == EGameState::PlayerIsDead)
+    {
+        DestroyPlayerLifeTimer();
+    }
 }

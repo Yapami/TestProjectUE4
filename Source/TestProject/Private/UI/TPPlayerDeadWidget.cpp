@@ -3,6 +3,8 @@
 #include "UI/TPPlayerDeadWidget.h"
 #include "GenericPlatform/GenericPlatformMisc.h"
 #include "Kismet/GameplayStatics.h"
+#include "SaveSystem/TPSaveGame.h"
+#include "TPUtils.h"
 
 void UTPPlayerDeadWidget::ExitGame()
 {
@@ -14,14 +16,15 @@ void UTPPlayerDeadWidget::RestartGame()
     UGameplayStatics::OpenLevel(this, FName(*GetWorld()->GetName()), false);
 }
 
-FString UTPPlayerDeadWidget::GetGameTimeResults(int32 Index) const
+FString UTPPlayerDeadWidget::GetGameResultByIndex(int32 Index) const
 {
-    return "0" + FString::FromInt(GameTimeResults[Index] / 60) + ":" +
-           ((GameTimeResults[Index] % 60) < 10 ? "0" : "") +
-           FString::FromInt(GameTimeResults[Index] % 60);
-}
+    UTPSaveGame* SaveGameInstance =
+        Cast<UTPSaveGame>(UGameplayStatics::LoadGameFromSlot("TPSaves", 0));
 
-void UTPPlayerDeadWidget::SetTimeResultsArray(TArray<int32> TimeResults)
-{
-    GameTimeResults = TimeResults;
+    if ((Index < 0) && (Index > SaveGameInstance->GetGameResults().Num()) &&
+        !SaveGameInstance->GetGameResults().IsValidIndex(Index))
+    {
+        return "---";
+    }
+    return TPUtils::IntToTime(SaveGameInstance->GetGameResults()[Index]);
 }

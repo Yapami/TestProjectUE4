@@ -21,12 +21,6 @@ protected:
     UFUNCTION(BlueprintCallable)
     void RestartGame();
 
-    UFUNCTION(BlueprintCallable, Category = "UI")
-    FString GetGameTimeResults(int32 Index) const;
-
-private:
-    TArray<int32> GameTimeResults;
-
-public:
-    void SetTimeResultsArray(TArray<int32> TimeResults);
+    UFUNCTION(BlueprintCallable)
+    FString GetGameResultByIndex(int32 Index) const;
 };

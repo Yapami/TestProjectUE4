@@ -3,75 +3,126 @@
 #include "Pickups/TPSpeedPickup.h"
 #include "Character/TPCharacter.h"
 #include "Components/TextRenderComponent.h"
-#include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "TPGameModeBase.h"
+#include "TPUtils.h"
 #include "TimerManager.h"
 
 ATPSpeedPickup::ATPSpeedPickup()
 {
-    SpeedPickup = CreateDefaultSubobject<UStaticMeshComponent>("SpeedPickup");
-    SpeedPickup->SetupAttachment(GetRootComponent());
+    PrimaryActorTick.bCanEverTick = true;
 
     TextComponent = CreateDefaultSubobject<UTextRenderComponent>("TextComponent");
     TextComponent->SetupAttachment(GetRootComponent());
     TextComponent->SetVisibility(false);
 }
 
+void ATPSpeedPickup::BeginPlay()
+{
+    Super::BeginPlay();
+
+    ATPGameModeBase* GameMode = Cast<ATPGameModeBase>(GetWorld()->GetAuthGameMode());
+    if (!GameMode)
+    {
+        return;
+    }
+    GameMode->OnChangeGameState.AddDynamic(this, &ATPSpeedPickup::ChangeGameState);
+}
+
 void ATPSpeedPickup::ShowTimeToRespawn()
 {
-    int32 Seconds = 16 - GetWorld()->GetTimerManager().GetTimerElapsed(RespawnTimer);
-    TextComponent->SetText(
-        FText::FromString((Seconds < 10 ? "0" : "") + FString::FromInt(Seconds)));
+    FTimerDelegate UpdateRespawnTime;
+    UpdateRespawnTime.BindLambda([&]() {
+        int32 Seconds =
+            static_cast<int32>((TimeToSpeedPickupRespawn + 1) -
+                               GetWorld()->GetTimerManager().GetTimerElapsed(RespawnTimer));
+        TextComponent->SetText(TPUtils::IntToTime(Seconds));
+    });
+
+    TextComponent->SetText(TPUtils::IntToTime(static_cast<int32>(TimeToSpeedPickupRespawn)));
+    TextComponent->SetVisibility(true);
+
+    float TimeUpdateFrequency = 1.0;
+    GetWorld()->GetTimerManager().SetTimer(RespawnTimeTimer, UpdateRespawnTime, TimeUpdateFrequency,
+                                           true);
 }
 
 void ATPSpeedPickup::Tick(float DeltaTime)
 {
+    Super::Tick(DeltaTime);
+
     APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-    check(PlayerController);
+    if (!PlayerController)
+    {
+        return;
+    }
 
-    FRotator PlayerViewPoint;
-    FVector Vector;
-    PlayerController->GetPlayerViewPoint(Vector, PlayerViewPoint);
+    FRotator RotationPlayerViewPoint;
+    FVector Vector; // Unusable variable
+    PlayerController->GetPlayerViewPoint(Vector, RotationPlayerViewPoint);
 
-    TextComponent->SetWorldRotation(
-        FRotator(-PlayerViewPoint.Pitch, PlayerViewPoint.Yaw + 180.f, PlayerViewPoint.Roll));
+    const float TurnCompensationPitch = -1;
+    const float TurnCompensationYaw = 180.0f;
+    TextComponent->SetWorldRotation(FRotator(TurnCompensationPitch * RotationPlayerViewPoint.Pitch,
+                                             RotationPlayerViewPoint.Yaw + TurnCompensationYaw,
+                                             RotationPlayerViewPoint.Roll));
+}
+
+void ATPSpeedPickup::PickupRespawnTimerStart()
+{
+    FTimerDelegate RespawnCallback;
+    RespawnCallback.BindLambda([&]() {
+        MakePickupReachable();
+
+        GetWorld()->GetTimerManager().ClearTimer(RespawnTimeTimer);
+        TextComponent->SetVisibility(false);
+    });
+
+    MakePickupUnreachable();
+
+    GetWorld()->GetTimerManager().SetTimer(RespawnTimer, RespawnCallback, TimeToSpeedPickupRespawn,
+                                           false);
+}
+
+void ATPSpeedPickup::ChangePlayerSpeed(AActor* Actor)
+{
+    ATPCharacter* Player = Cast<ATPCharacter>(Actor);
+    if (!Player)
+    {
+        return;
+    }
+
+    FTimerDelegate SetNormalSpeedCallback;
+    SetNormalSpeedCallback.BindLambda(
+        [Player]() { Player->SetMaxWalkSpeed(Player->GetNormalSpeed()); });
+
+    Player->SetMaxWalkSpeed(Player->GetNormalSpeed() * SpeedMultiplier);
+    GetWorld()->GetTimerManager().SetTimer(SetNormalSpeedTimer, SetNormalSpeedCallback,
+                                           HighSpeedDuration, false);
 }
 
 void ATPSpeedPickup::NotifyActorBeginOverlap(AActor* OtherActor)
 {
     Super::NotifyActorBeginOverlap(OtherActor);
 
-    ATPCharacter* Player = Cast<ATPCharacter>(OtherActor);
-    if (!Player)
+    ChangePlayerSpeed(OtherActor);
+
+    PickupRespawnTimerStart();
+
+    ShowTimeToRespawn();
+}
+
+void ATPSpeedPickup::ChangeGameState(EGameState GameState)
+{
+    if (GameState == EGameState::PlayerIsDead)
     {
-        return;
+        FinishAllTimers();
     }
-    float& MaxWalkSpeed = Player->GetCharacterMovement()->MaxWalkSpeed;
+}
 
-    FTimerHandle SetNormalSpeedTimer;
-    FTimerDelegate SetNormalSpeedCallback;
-    SetNormalSpeedCallback.BindLambda([&MaxWalkSpeed]() { MaxWalkSpeed = 800; });
-
-    MaxWalkSpeed *= 1.5;
-    GetWorld()->GetTimerManager().SetTimer(SetNormalSpeedTimer, SetNormalSpeedCallback, 5.f, false);
-
-    FTimerDelegate RespawnCallback;
-    RespawnCallback.BindLambda([&]() {
-        SpeedPickup->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Overlap);
-        SpeedPickup->SetVisibility(true, true);
-
-        GetWorld()->GetTimerManager().ClearTimer(RespawnTimeTimer);
-
-        TextComponent->SetVisibility(false);
-    });
-
-    SpeedPickup->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-    SpeedPickup->SetVisibility(false, true);
-
-    GetWorld()->GetTimerManager().SetTimer(RespawnTimer, RespawnCallback, 15.f, false);
-
-    TextComponent->SetText(FString::FromInt(15));
-    TextComponent->SetVisibility(true);
-    GetWorld()->GetTimerManager().SetTimer(RespawnTimeTimer, this,
-                                           &ATPSpeedPickup::ShowTimeToRespawn, 1.0f, true);
+void ATPSpeedPickup::FinishAllTimers()
+{
+    GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
+    GetWorld()->GetTimerManager().ClearTimer(RespawnTimeTimer);
+    GetWorld()->GetTimerManager().ClearTimer(SetNormalSpeedTimer);
 }

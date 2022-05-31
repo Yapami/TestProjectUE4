@@ -18,35 +18,27 @@ public:
     // Sets default values for this component's properties
     UTPHealthComponent();
 
+    FPlayerDeadSignature PlayerDead; //TO DO
+
     UFUNCTION(BlueprintCallable)
-    void OnTakeAnyDamageFunction(AActor* DamagedActor, float Damage,
+    void OnTakeAnyDamage(AActor* DamagedActor, float Damage,
                                  const class UDamageType* DamageType,
                                  class AController* InstigatedBy, AActor* DamageCauser);
 
+    UFUNCTION(BlueprintCallable)
+    float GeteHealthPercent() const;
+
     void SetHealth(float NewHealth);
 
-    FPlayerDeadSignature PlayerDead;
+    float GetHealth() const;
 
 protected:
-    // Called when the game starts
-    virtual void BeginPlay() override;
+    UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Health")
+    float MaxHealth = 100.f;
 
     float Health = 0.f;
-
-    UPROPERTY(Editanywhere, BlueprintReadWrite, Category = "Health")
-    float MaxHealth = 5.f;
 
     void OnPlayerDead();
 
     bool IsPlayerDead();
-
-public:
-    // Called every frame
-    virtual void TickComponent(float DeltaTime, ELevelTick TickType,
-                               FActorComponentTickFunction* ThisTickFunction) override;
-
-    float GetHealth();
-
-    UFUNCTION(BlueprintCallable)
-    float GeteHealthPercent() const;
 };

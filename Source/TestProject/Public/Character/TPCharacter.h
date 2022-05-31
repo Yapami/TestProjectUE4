@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "STUCoreTypes.h"
 #include "GameFramework/Character.h"
 #include "TPCharacter.generated.h"
 
@@ -19,9 +20,16 @@ public:
     // Sets default values for this character's properties
     ATPCharacter();
 
+    float GetNormalSpeed() const; 
+
+    float GetMaxWalkSpeed() const;
+
+    void SetMaxWalkSpeed(float Speed);
+
 protected:
-    // Called when the game starts or when spawned
-    virtual void BeginPlay() override;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraComponent")
+    float NormalSpeed = 800.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "CameraComponent")
     UCameraComponent* CameraComponent;
@@ -32,16 +40,18 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HealthComponent")
     UTPHealthComponent* HealthComponent;
 
+    // Called when the game starts or when spawned
+    virtual void BeginPlay() override;
+
     void MoveForward(float Amount);
+
     UFUNCTION(BlueprintCallable)
     void MoveRight(float Amount);
 
     UFUNCTION()
-    void OnPlayerDead();
+    void OnPlayerDead(EGameState GameState);
 
 public:
-    // Called every frame
-    virtual void Tick(float DeltaTime) override;
 
     // Called to bind functionality to input
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

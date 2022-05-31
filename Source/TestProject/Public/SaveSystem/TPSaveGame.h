@@ -14,9 +14,15 @@ class TESTPROJECT_API UTPSaveGame : public USaveGame
 {
     GENERATED_BODY()
 public:
-    void AddTimeResult(int32 TimeResult);
-    TArray<int32>& GetTimeResults();
+    void AddNewResult(int32 Result);
+
+    TArray<int32> GetGameResults() const;
+
+protected:
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "LeaderBoard")
+    int32 LidearBoardSize = 5;
 
 private:
-    TArray<int32> TimeResults{0, 0, 0, 0, 0};
+    UPROPERTY(VisibleAnywhere)
+    TArray<int32> GameResults;
 };

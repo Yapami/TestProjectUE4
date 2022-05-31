@@ -5,54 +5,64 @@
 #include "Kismet/GameplayStatics.h"
 #include "STUCoreTypes.h"
 #include "TPGameModeBase.h"
-#include "UI/TPPlayerHUDWidget.h"
 #include "UI/TPPlayerDeadWidget.h"
+#include "UI/TPPlayerHUDWidget.h"
 
 void ATPPlayerHUD::BeginPlay()
 {
     Super::BeginPlay();
 
-    GameState = EGameState::PlayerIsAlive;
+    PlayerAliveHUDWidget = CreateWidget<UUserWidget>(GetWorld(), PlayerHUDWidgetClass);
+    check(PlayerAliveHUDWidget);
 
-    PlayerHUDWidget = CreateWidget<UUserWidget>(GetWorld(), PlayerHUDWidgetClass);
-    if (PlayerHUDWidget)
-    {
-        PlayerHUDWidget->AddToViewport();
-    }
+    PlayerDeadHUDWidget = CreateWidget<UUserWidget>(GetWorld(), PlayerDeadWidgetClass);
+    check(PlayerAliveHUDWidget);
 
-    PlayerDeadWidget = CreateWidget<UUserWidget>(GetWorld(), PlayerDeadWidgetClass);
-
-    ATPGameModeBase* GameMode = CastChecked<ATPGameModeBase>(GetWorld()->GetAuthGameMode());
-    GameMode->OnChangeGameState.AddDynamic(this, &ATPPlayerHUD::ChangeWidget);
+    ATPGameModeBase* GameMode = Cast<ATPGameModeBase>(GetWorld()->GetAuthGameMode());
+    check(GameMode);
+    GameMode->OnChangeGameState.AddDynamic(this, &ATPPlayerHUD::ChangeGameState);
 }
 
 void ATPPlayerHUD::UpdateGameTime(float Time)
 {
-    Cast<UTPPlayerHUDWidget>(PlayerHUDWidget)->SetTimeSinceGameStart(Time);
+    Cast<UTPPlayerHUDWidget>(PlayerAliveHUDWidget)->SetTimeSinceGameStart(Time);
 }
 
-void ATPPlayerHUD::ChangeWidget(EGameState GameStateParam)
+void ATPPlayerHUD::ChangeGameState(EGameState State)
 {
     APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 
     ATPGameModeBase* GameMode = CastChecked<ATPGameModeBase>(GetWorld()->GetAuthGameMode());
 
-    switch (GameStateParam)
+    switch (State)
     {
     case EGameState::PlayerIsDead:
+
         if (PlayerController)
         {
-            PlayerController->bShowMouseCursor = PlayerController->bEnableClickEvents =
-                PlayerController->bEnableMouseOverEvents = true;
+            PlayerController->bShowMouseCursor = true;
+            PlayerController->bEnableClickEvents = true;
+            PlayerController->bEnableMouseOverEvents = true;
+            PlayerController->SetInputMode(FInputModeUIOnly());
         }
 
-        PlayerHUDWidget->RemoveFromViewport();
-        PlayerDeadWidget->AddToViewport();
+        PlayerAliveHUDWidget->RemoveFromViewport();
+        PlayerDeadHUDWidget->AddToViewport();
 
         break;
     case EGameState::PlayerIsAlive:
-        PlayerDeadWidget->RemoveFromViewport();
-        PlayerHUDWidget->AddToViewport();
+
+        if (PlayerController)
+        {
+            PlayerController->bShowMouseCursor = false;
+            PlayerController->bEnableClickEvents = false;
+            PlayerController->bEnableMouseOverEvents = false;
+            PlayerController->SetInputMode(FInputModeGameOnly());
+        }
+
+        PlayerDeadHUDWidget->RemoveFromViewport();
+        PlayerAliveHUDWidget->AddToViewport();
+
         break;
     default:
         break;

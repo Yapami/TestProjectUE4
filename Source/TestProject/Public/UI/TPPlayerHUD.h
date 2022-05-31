@@ -15,6 +15,14 @@ UCLASS()
 class TESTPROJECT_API ATPPlayerHUD : public AHUD
 {
     GENERATED_BODY()
+
+public:
+    UFUNCTION()
+    void UpdateGameTime(float Time);
+
+    UFUNCTION()
+    void ChangeGameState(EGameState State);
+
 protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
     TSubclassOf<UUserWidget> PlayerHUDWidgetClass;
@@ -24,16 +32,7 @@ protected:
 
     virtual void BeginPlay() override;
 
-public:
-    UFUNCTION()
-    void UpdateGameTime(float Time);
-
-    UFUNCTION()
-    void ChangeWidget(EGameState GameState1);
-
 private:
-    UUserWidget* PlayerHUDWidget;
-    UUserWidget* PlayerDeadWidget;
-
-    EGameState GameState;
+    UUserWidget* PlayerAliveHUDWidget;
+    UUserWidget* PlayerDeadHUDWidget;
 };

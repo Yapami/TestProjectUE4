@@ -10,8 +10,6 @@
 
 class UTPSaveGame;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FUpdateGameTimeSignature, float, Time);
-
 /**
  *
  */
@@ -20,36 +18,38 @@ class TESTPROJECT_API ATPGameModeBase : public AGameModeBase
 {
     GENERATED_BODY()
 
-    ATPGameModeBase();
-
 public:
-    void HealthPickupsRespawn();
-
-    void SetupPlayerLifeTimer();
-
-    void DestroyPlayerLifeTimer();
+    ATPGameModeBase();
 
     FTimerHandle PlayerLifeTimer;
 
     FGameStateSignature OnChangeGameState;
 
+    void HealthPickupsRespawn();
+
+    void SetupGameStatePlayerAlive();
+
+    void DestroyPlayerLifeTimer();
+
 protected:
-    virtual void BeginPlay() override;
-
-    TArray<AActor*> HealthPickups;
-
-    bool IsAnyHealthPickupReachable();
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
+    float TimerRate = 1.0f;
 
     FUpdateGameTimeSignature UpdateGameTimeDelegate;
 
-    void UpdateGameTime();
+    TArray<AActor*> HealthPickups;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "UI")
-    float TimerRate = 1.0f;
+    virtual void BeginPlay() override;
+
+    bool IsAnyHealthPickupReachable();
+
+    void UpdateGameTime();
 
 private:
     float TimerRemaining = 0;
 
     UFUNCTION()
-    void FinishGame();
+    void ChangeGameState(EGameState State);
+
+    void SaveResult();
 };

@@ -7,21 +7,24 @@
 #include "TPHealthPickup.generated.h"
 
 /**
- * 
+ *
  */
 UCLASS()
 class TESTPROJECT_API ATPHealthPickup : public ATPBasePickup
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
+public:
     ATPHealthPickup();
 
-public:
-    UFUNCTION(BlueprintCallable)
-    void PickupRespawn();
-    bool IsPickupReachable();
-
 protected:
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HealthCrossPickup")
-    UStaticMeshComponent* HealthCrossPickup;
     virtual void NotifyActorBeginOverlap(AActor* OtherActor) override;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "HealthPickup")
+    float HealingAmount = 30.0f;
+
+private:
+
+    void MakeReachableRandomHealthPickup();
+
+    void HealingPlayer(AActor* Actor);
 };

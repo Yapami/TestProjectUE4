@@ -3,56 +3,72 @@
 #include "Dev/TPPainCausingVolume.h"
 #include "Character/TPCharacter.h"
 #include "Components/BoxComponent.h"
-#include "Components/TPHealthComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "TPGameModeBase.h"
 
 ATPPainCausingVolume::ATPPainCausingVolume()
 {
     PrimaryActorTick.bCanEverTick = false;
 
     SceneComponent = CreateDefaultSubobject<USceneComponent>("SceneComponent");
-    RootComponent = SceneComponent;
+    check(SceneComponent);
+    SetRootComponent(SceneComponent);
 
     CollisionComponent = CreateDefaultSubobject<UBoxComponent>("CollisionComponent");
-    CollisionComponent->SetupAttachment(SceneComponent);
+    check(CollisionComponent);
+    CollisionComponent->SetupAttachment(GetRootComponent());
 }
 
 void ATPPainCausingVolume::BeginPlay()
 {
     Super::BeginPlay();
 
-    APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
-    check(PlayerController);
-    ACharacter* Player = PlayerController->GetCharacter();
-    check(Player);
-
-    UTPHealthComponent* HealthComponent = CastChecked<UTPHealthComponent>(
-        Player->GetComponentByClass(UTPHealthComponent::StaticClass()));
-    HealthComponent->PlayerDead.AddDynamic(this, &ATPPainCausingVolume::FinishTimers);
+    ATPGameModeBase* GameMode = Cast<ATPGameModeBase>(GetWorld()->GetAuthGameMode());
+    if (!GameMode)
+    {
+        return;
+    }
+    GameMode->OnChangeGameState.AddDynamic(this, &ATPPainCausingVolume::ApplyDamageSwitcher);
 
     ApplyPainVolume();
 }
 
 void ATPPainCausingVolume::ApplyPainVolume()
 {
-    FTimerDelegate TimerCallback;
-    TimerCallback.BindLambda([&] { DamagePerSec *= 1.1f; });
-
     FTimerDelegate DamageTick;
     DamageTick.BindLambda([&] {
-        UGameplayStatics::ApplyDamage(
-            UGameplayStatics::GetPlayerController(GetWorld(), 0)->GetCharacter(),
-            DamagePerSec / 10,
-            nullptr, this, UDamageType::StaticClass());
+        static float TimeElapsed = 0;
+        TimeElapsed += DamageTimerFrequancy / TimerTicksPerSecond;
+        if (FMath::IsNearlyEqual(TimeElapsed, IncreaseDamageFrequancy, 0.001f))
+        {
+            TimeElapsed = 0;
+            DamagePerSec *= DamageMultiplier;
+        }
+
+        APlayerController* PlayerController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+        check(PlayerController);
+        ACharacter* Player = PlayerController->GetCharacter();
+        check(Player);
+
+        UGameplayStatics::ApplyDamage(Player, DamagePerSec / TimerTicksPerSecond, nullptr, this,
+                                      UDamageType::StaticClass());
     });
 
-    GetWorld()->GetTimerManager().SetTimer(IncreaseDamage, TimerCallback, 5.f, true);
-
-    GetWorld()->GetTimerManager().SetTimer(TimeSinceGameStart, DamageTick, 1.f / 10, true);
+    GetWorld()->GetTimerManager().SetTimer(ApplyDamageEverySecondTimer, DamageTick,
+                                           DamageTimerFrequancy / TimerTicksPerSecond, true);
 }
 
-void ATPPainCausingVolume::FinishTimers()
+void ATPPainCausingVolume::ApplyDamageSwitcher(EGameState GameState)
 {
-    GetWorld()->GetTimerManager().ClearTimer(IncreaseDamage);
-    GetWorld()->GetTimerManager().ClearTimer(TimeSinceGameStart);
+    switch (GameState)
+    {
+    case EGameState::PlayerIsDead:
+        GetWorld()->GetTimerManager().ClearTimer(ApplyDamageEverySecondTimer);
+        break;
+    case EGameState::PlayerIsAlive:
+        ApplyPainVolume();
+        break;
+    default:
+        break;
+    }
 }
