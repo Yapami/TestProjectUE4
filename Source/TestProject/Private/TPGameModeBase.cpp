@@ -110,12 +110,6 @@ void ATPGameModeBase::SaveResult()
 
     SaveGameInstance->AddNewResult(TimerRemaining);
 
-    for (auto A : SaveGameInstance->GetGameResults())
-    {
-        UE_LOG(LogTemp, Error, TEXT("%i"), A)
-    }
-    UE_LOG(LogTemp, Error, TEXT("------------------------------------"))
-
     UGameplayStatics::SaveGameToSlot(SaveGameInstance, TEXT("TPSaves"), 0);
 }
 
